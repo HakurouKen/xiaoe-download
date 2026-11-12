@@ -15,7 +15,6 @@ import { StoreClient } from './store';
 
 import type { Content, Course } from './model';
 
-const defaultUrl = 'https://appugoxosta5125.h5.xet.pomoho.com/p/t/v1/ecommerce/pay_record/record';
 const help = `小鹅通已购课程下载器（Node.js 24）
 
 用法：
@@ -25,7 +24,7 @@ const help = `小鹅通已购课程下载器（Node.js 24）
   xiaoe-download media <资源 ID 或 URL> [选项]
 
 选项：
-  --url <URL>         购买记录地址（默认使用本项目目标店铺）
+  --url <URL>         购买记录地址（必须明确指定目标店铺）
   --cdp <地址>        已登录 Chrome 调试地址，默认 ws://127.0.0.1:9222/devtools/browser
   --output <目录>     输出目录，默认 downloads
   --cookie-cache <路径> Cookie 缓存文件，默认 .cache/cookies/<店铺摘要>.json
@@ -62,14 +61,15 @@ async function main(): Promise<void> {
     console.log(help);
     return;
   }
-  const command = positionals[0] ?? 'all';
-  if (!['all', 'list', 'course', 'media'].includes(command))
+  const command = positionals[0];
+  if (!command || !['all', 'list', 'course', 'media'].includes(command))
     throw new Error('未知命令，运行 --help 查看用法');
   if (positionals.length > 2) throw new Error('位置参数过多');
   const target = positionals[1];
   if (['course', 'media'].includes(command) && !target)
     throw new Error(`${command} 需要课程 / 资源 ID 或 URL`);
-  const url = values.url ?? (['all', 'list'].includes(command) && target ? target : defaultUrl);
+  const url = values.url ?? (['all', 'list'].includes(command) ? target : undefined);
+  if (!url) throw new Error('请通过 --url 或 all/list 位置参数明确指定目标店铺购买记录 URL');
   if (!['http:', 'https:'].includes(new URL(url).protocol))
     throw new Error('店铺地址必须是 HTTP(S)');
   const concurrency = Number(values.concurrency ?? 6);

@@ -12,13 +12,14 @@
     "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "pnpm build && vitest run --config vitest.e2e.config.ts",
+    "test:e2e": "pnpm build && pnpm build:skill && vitest run --config vitest.e2e.config.ts",
     "lint": "oxlint --type-aware",
     "lint:fix": "oxlint --type-aware --fix",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "typecheck": "tsgo --noEmit",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm build:skill",
+    "build:skill": "tsx scripts/build-skill.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

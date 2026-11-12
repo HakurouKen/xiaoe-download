@@ -4,6 +4,7 @@
   "rules": { "no-debugger": "error", "import/no-cycle": "error", "no-await-in-loop": "off" },
   "ignorePatterns": [
     "dist/**",
+    "skills/xiaoe-download/scripts/**",
     "node_modules/**",
     "downloads/**",
     ".playwright-mcp/**",

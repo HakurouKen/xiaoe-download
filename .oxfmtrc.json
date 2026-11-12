@@ -6,6 +6,8 @@
   "printWidth": 100,
   "ignorePatterns": [
     "dist/**",
+    "skills/xiaoe-download/scripts/**",
+    "skills/xiaoe-download/references/third-party-licenses.txt",
     "node_modules/**",
     "downloads/**",
     ".playwright-mcp/**",

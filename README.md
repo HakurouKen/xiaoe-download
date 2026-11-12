@@ -16,27 +16,30 @@ pnpm build
 首次获取或刷新登录态时，在当前 Chrome 中打开 `chrome://inspect/#remote-debugging`，开启远程调试并打开已登录店铺页面，在提示时允许连接。获取后立即断开，不关闭或重启 Chrome。缓存有效时无需 Chrome 正在运行。
 
 ```sh
-# 下载全部已购课程，默认使用本项目给定的购买记录 URL
-pnpm start all
+# 明确指定目标店铺购买记录 URL；下面的变量为示例，请替换
+STORE_URL='https://你的店铺/p/t/v1/ecommerce/pay_record/record'
+
+# 下载全部已购课程
+pnpm start all --url "$STORE_URL"
 
 # 忽略缓存，从 Chrome 重新获取登录态
-pnpm start all --refresh-cookie
+pnpm start all --url "$STORE_URL" --refresh-cookie
 
 # 自定义 Cookie 缓存路径
-pnpm start all --cookie-cache .cache/my-store.json
+pnpm start all --url "$STORE_URL" --cookie-cache .cache/my-store.json
 
 # 只扫描完整目录并创建图文、文档占位
-pnpm start all --catalog-only
+pnpm start all --url "$STORE_URL" --catalog-only
 
 # 下载单个课程 / 单个资源，接受 ID 或同店铺 URL
-pnpm start course course_示例
-pnpm start media a_示例
+pnpm start course course_示例 --url "$STORE_URL"
+pnpm start media a_示例 --url "$STORE_URL"
 
 # 仅下载图文和文档，升级已有占位，跳过其他类型
-pnpm start all --kinds text,document
+pnpm start all --url "$STORE_URL" --kinds text,document
 
 # 仅保存目录，不创建占位或下载内容
-pnpm start list
+pnpm start list --url "$STORE_URL"
 
 pnpm start --help
 ```
@@ -79,3 +82,7 @@ pnpm test:e2e
 单元测试覆盖递归分页、文件名冲突、媒体及签名图文解析、全文权限、文档下载权限、Cookie 缓存、域和路径限制、认证刷新并发去重及浏览器断开。集成测试通过真实 ffmpeg 生成音频和 AES-128 HLS，验证媒体下载、编号、占位升级、原图及附件本地化、原文档下载、错误响应拒绝、跳过、损坏恢复、中断发布恢复和未知文件冲突保护。Oxlint 允许循环中的顺序 await，因为分页、重试和按资源保存清单依赖前一步结果；HLS 分片独立采用受限并发。
 
 `scripts/probe-chrome.ts` 是开发用 Chrome MCP 连接检查脚本，生产下载不启动 MCP 服务。
+
+## 标准 Skill 分发
+
+`skills/xiaoe-download/` 是可直接复制的标准 Skill，随附自包含下载器，不需要用户克隆项目、运行 pnpm 或安装 npm 依赖。Skill 负责环境检查和准备、目标确认、执行及结果解释；Node.js 24、媒体工具与 Chrome 仍由用户环境提供。维护者使用 `pnpm build:skill` 重新生成运行文件和第三方许可证。职责、用户数据边界及实际验证情况见 [skills/README.md](skills/README.md)。
