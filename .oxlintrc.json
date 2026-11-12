@@ -1,0 +1,12 @@
+{
+  "categories": { "correctness": "error", "perf": "error" },
+  "plugins": ["import", "typescript", "node"],
+  "rules": { "no-debugger": "error", "import/no-cycle": "error", "no-await-in-loop": "off" },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "downloads/**",
+    ".playwright-mcp/**",
+    ".cache/**"
+  ]
+}

@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Downloads, credentials, and local research
+downloads/
+.cache/
+.scratch/
+.playwright-mcp/
+.worktrees/
+*.har
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs and system files
+*.log
+.DS_Store
+Thumbs.db
