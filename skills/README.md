@@ -8,12 +8,14 @@ Skill 只负责环境准备、目标确认、调用下载器和解释结果；�
 skills/xiaoe-download/
   SKILL.md
   scripts/skill.mjs
+  scripts/doctor.mjs
   scripts/skill-environment.mjs
   references/downloader -> ../../../dist
   tests/
 ```
 
 - `scripts/` 是手写并提交 Git 的 `.mjs`，只导入 Node 内置模块及同目录模块，不参与 TypeScript 打包。入口以子进程执行 `references/downloader/cli.mjs`，传递参数、继承日志并传播退出状态，不修改父进程参数或动态导入核心 CLI。
+- `doctor.mjs` 独立返回只读检查报告，`skill.mjs` 通过 `--doctor` 分支调用并输出 JSON；不新增命令入口，不读取 Cookie 或默认连接环境变量中的调试地址。
 - `references/downloader` 在源码树中引用唯一主构建的产物。维护者先运行 `pnpm build` 后可本地使用；直接复制源码目录、仅拉取 Skill 子目录或清理 `dist/` 都不能得到独立可运行包。Windows 源码检出不承诺软链接开箱即用。
 - 主构建生成 CLI、全部共享 chunk 和一份第三方许可声明；Skill 不另行收集或复制许可声明。构建与依赖内联约定见 [build/README.md](../build/README.md)。
 - Release 包中指定链接展开为真实文件，用户不需要项目源码、pnpm、npm 依赖或创建软链接。Node.js 24、ffmpeg、ffprobe 和 Chrome 不随包交付。

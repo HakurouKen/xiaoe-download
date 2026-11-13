@@ -5,6 +5,7 @@ import path from 'node:path';
 import util from 'node:util';
 import url from 'node:url';
 
+import { doctor } from './doctor.mjs';
 import {
   canonicalDirectory,
   commandAvailable,
@@ -72,36 +73,7 @@ async function main() {
   const nodeReady = Number(process.versions.node.split('.')[0]) === 24;
   if (!nodeReady) throw new Error('需要 Node.js 24，请在获得用户许可后安装并重试');
   if (values.doctor) {
-    const ffmpeg = await commandAvailable(values.ffmpeg ?? 'ffmpeg', ['-version']);
-    const ffprobe = await commandAvailable(values.ffprobe ?? 'ffprobe', ['-version']);
-    let cdp = '未检查；缓存有效时无需 Chrome，首次或刷新登录态需用户开启调试并允许连接';
-    const endpoint = values.cdp;
-    if (endpoint && /^https?:/.test(endpoint)) {
-      try {
-        const response = await fetch(new URL('/json/version', endpoint), {
-          signal: AbortSignal.timeout(5000),
-        });
-        cdp = response.ok
-          ? 'HTTP 调试服务可达；尚未验证店铺登录态'
-          : `HTTP ${response.status}；请检查 Chrome 调试地址`;
-      } catch {
-        cdp = 'HTTP 调试服务不可达；请用户开启调试并确认地址';
-      }
-    }
-    console.log(
-      JSON.stringify(
-        {
-          node: process.versions.node,
-          ffmpeg,
-          ffprobe,
-          stateDirectory: stateDirectory(),
-          cdp,
-          prepared: false,
-        },
-        null,
-        2,
-      ),
-    );
+    console.log(JSON.stringify(await doctor(values), null, 2));
     return;
   }
   if (!values.output || !path.isAbsolute(values.output))
