@@ -3,7 +3,7 @@ import { defineConfig } from 'tsdown';
 /** 分发目录只保留 Node 内置模块为外部依赖，不包含源码映射或凭据。 */
 export default defineConfig({
   entry: ['src/cli.ts', 'src/skill.ts'],
-  outDir: 'skills/xiaoe-download/scripts',
+  outDir: 'dist/skill/xiaoe-download/scripts',
   platform: 'node',
   format: 'esm',
   deps: { alwaysBundle: [/.*/], onlyImport: [/^node:/] },

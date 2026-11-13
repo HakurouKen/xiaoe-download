@@ -9,12 +9,12 @@ import path from 'node:path';
 import util from 'node:util';
 
 import { stateDirectory } from './skill-environment';
+import { checksum, unpackSkill } from '../scripts/skill-package';
 
 const execFile = util.promisify(cp.execFile);
 
-it('复制 Skill 后在包外独立检查、准备和扫描，不访问原项目依赖', async () => {
+it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描，不访问原项目依赖', async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'xiaoe skill '));
-  const skill = path.join(root, 'copied skill');
   const home = path.join(root, 'home');
   const output = path.join(root, 'output files');
   const env = {
@@ -68,7 +68,16 @@ it('复制 Skill 后在包外独立检查、准备和扫描，不访问原项目
     );
   });
   try {
-    await fsp.cp('skills/xiaoe-download', skill, { recursive: true });
+    const release = process.env.SKILL_RELEASE_DIR ?? 'dist/release';
+    const archives = (await fsp.readdir(release)).filter((name) => name.endsWith('.zip'));
+    expect(archives).toHaveLength(1);
+    const filename = archives[0];
+    if (!filename) throw new Error('缺少待验收 ZIP');
+    const archive = await fsp.readFile(path.join(release, filename));
+    expect(await fsp.readFile(path.join(release, `${filename}.sha256`), 'utf8')).toBe(
+      checksum(archive, filename),
+    );
+    const skill = await unpackSkill(archive, path.join(root, 'extracted skill'));
     const run = (args: string[], overrides: NodeJS.ProcessEnv = {}) =>
       execFile(process.execPath, [path.join(skill, 'scripts', 'skill.mjs'), ...args], {
         cwd: root,

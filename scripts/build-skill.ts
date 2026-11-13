@@ -17,6 +17,7 @@ async function licenseFiles(directory: string): Promise<string[]> {
 }
 
 async function main(): Promise<void> {
+  await fsp.rm('dist/skill', { recursive: true, force: true });
   const result = await build({ ...config, config: false });
   const roots = new Set<string>();
   const sourceNotices = new Set<string>();
@@ -89,9 +90,13 @@ async function main(): Promise<void> {
     '=== 内联源文件版权及许可声明（含第三方嵌入代码） ===',
     ...[...sourceNotices].sort(),
   );
-  await fsp.mkdir('skills/xiaoe-download/references', { recursive: true });
+  await fsp.cp('skills/xiaoe-download', 'dist/skill/xiaoe-download', {
+    recursive: true,
+    filter: (source) => !['scripts', 'third-party-licenses.txt'].includes(path.basename(source)),
+  });
+  await fsp.mkdir('dist/skill/xiaoe-download/references', { recursive: true });
   await fsp.writeFile(
-    'skills/xiaoe-download/references/third-party-licenses.txt',
+    'dist/skill/xiaoe-download/references/third-party-licenses.txt',
     `${notices.join('\n\n')}\n`,
   );
   console.log(`Skill 已生成，保留 ${roots.size} 个依赖的许可证。`);

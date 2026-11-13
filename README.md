@@ -85,4 +85,6 @@ pnpm test:e2e
 
 ## 标准 Skill 分发
 
-`skills/xiaoe-download/` 是可直接复制的标准 Skill，随附自包含下载器，不需要用户克隆项目、运行 pnpm 或安装 npm 依赖。Skill 负责环境检查和准备、目标确认、执行及结果解释；Node.js 24、媒体工具与 Chrome 仍由用户环境提供。维护者使用 `pnpm build:skill` 重新生成运行文件和第三方许可证。职责、用户数据边界及实际验证情况见 [skills/README.md](skills/README.md)。
+从 [GitHub Releases](https://github.com/HakurouKen/xiaoe-download/releases) 下载明确版本的 `xiaoe-download-skill-v<版本号>.zip` 及 `.zip.sha256`，核对 SHA-256 后解压，将完整 `xiaoe-download/` 安装到所用 Agent 的 Skill 目录。包内随附自包含下载器，不需要用户克隆项目、运行 pnpm 或安装 npm 依赖；Node.js 24、媒体工具与 Chrome 仍由用户环境提供。升级时替换整个 Skill 目录，保留包外用户状态和下载目录。
+
+仓库中的 `skills/xiaoe-download/` 只保存手写源文件，不能直接复制运行；GitHub 自动生成的 Source code ZIP 也不是安装包。维护者运行 `pnpm package:skill` 在 `dist/` 构建并生成分发附件；版本 tag 工作流验收后创建草稿 Release，由人工正式发布。安装、构建、发布流程及实际验证情况见 [skills/README.md](skills/README.md)。

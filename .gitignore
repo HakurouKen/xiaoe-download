@@ -2,6 +2,9 @@
 node_modules/
 .pnpm-store/
 dist/
+# Legacy Skill output: source directories must never track generated bundles.
+skills/*/scripts/*.mjs
+skills/*/references/third-party-licenses.txt
 coverage/
 *.tsbuildinfo
 
