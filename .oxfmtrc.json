@@ -6,6 +6,7 @@
   "printWidth": 100,
   "ignorePatterns": [
     "dist/**",
+    "skills/*/references/downloader/**",
     "node_modules/**",
     "downloads/**",
     ".playwright-mcp/**",

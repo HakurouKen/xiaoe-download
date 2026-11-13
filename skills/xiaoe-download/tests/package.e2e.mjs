@@ -8,8 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import util from 'node:util';
 
-import { stateDirectory } from './skill-environment';
-import { checksum, unpackSkill } from '../scripts/skill-package';
+import { stateDirectory } from '../scripts/skill-environment.mjs';
+import { checksum } from '../../../scripts/release';
 
 const execFile = util.promisify(cp.execFile);
 
@@ -77,8 +77,34 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     expect(await fsp.readFile(path.join(release, `${filename}.sha256`), 'utf8')).toBe(
       checksum(archive, filename),
     );
-    const skill = await unpackSkill(archive, path.join(root, 'extracted skill'));
-    const run = (args: string[], overrides: NodeJS.ProcessEnv = {}) =>
+    const extracted = path.join(root, 'extracted skill');
+    if (process.platform === 'win32') {
+      // 使用系统解压器验证用户安装路径，不要求 Windows 创建源码软链接。
+      await execFile(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          'Expand-Archive -LiteralPath $env.XIAOE_TEST_ZIP -DestinationPath $env.XIAOE_TEST_EXTRACT',
+        ],
+        {
+          env: {
+            ...process.env,
+            XIAOE_TEST_ZIP: path.resolve(release, filename),
+            XIAOE_TEST_EXTRACT: extracted,
+          },
+        },
+      );
+    } else await execFile('unzip', ['-q', path.resolve(release, filename), '-d', extracted]);
+    const skill = path.join(extracted, 'xiaoe-download');
+    expect((await fsp.lstat(path.join(skill, 'references/downloader'))).isSymbolicLink()).toBe(
+      false,
+    );
+    const downloaderFiles = await fsp.readdir(path.join(skill, 'references/downloader'));
+    expect(downloaderFiles).toContain('third-party-licenses.txt');
+    expect(downloaderFiles.some((name) => name.endsWith('.map'))).toBe(false);
+    const run = (args, overrides = {}) =>
       execFile(process.execPath, [path.join(skill, 'scripts', 'skill.mjs'), ...args], {
         cwd: root,
         env: { ...env, ...overrides },
@@ -100,10 +126,13 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     await expect(
       run(['--prepare', '--output', path.join(skill, 'downloads')]),
     ).rejects.toMatchObject({ stderr: expect.stringContaining('之外') });
+    await expect(
+      run(['--prepare', '--output', path.join(skill, 'references/downloader/downloads')]),
+    ).rejects.toMatchObject({ stderr: expect.stringContaining('之外') });
     await run(['--prepare', '--output', output]);
     const state = stateDirectory(process.platform, home, env);
     if (process.platform !== 'win32') expect((await fsp.stat(state)).mode & 0o777).toBe(0o700);
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('测试服务器未启动');
     const origin = `http://127.0.0.1:${address.port}`;
@@ -159,7 +188,7 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
         '--cdp',
         `ws://127.0.0.1:${address.port}/devtools/browser`,
       ]),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: 1 });
     // 模拟拒绝握手仍能验证复制后的 Node WebSocket 传输实际被加载并发起连接。
     expect(upgraded).toBe(true);
     await expect(fsp.access(path.join(output, '.xiaoe.lock'))).rejects.toThrow();
@@ -167,7 +196,34 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
       run(['all', '--url', `${origin}/record`, '--output', output, '--ffmpeg', 'missing-ffmpeg']),
     ).rejects.toMatchObject({ stderr: expect.stringContaining('缺少 ffmpeg') });
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise((resolve) => server.close(() => resolve()));
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+it('辅助入口通过子进程调用 CLI，传递参数及原始退出码，缺失产物时明确报错', async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'skill child process '));
+  const skill = path.join(root, 'installed skill');
+  try {
+    await fsp.cp('skills/xiaoe-download/scripts', path.join(skill, 'scripts'), { recursive: true });
+    const cli = path.join(skill, 'references/downloader/cli.mjs');
+    await fsp.mkdir(path.dirname(cli), { recursive: true });
+    await fsp.writeFile(
+      cli,
+      'console.log(JSON.stringify(process.argv.slice(2))); process.exitCode = 7;',
+    );
+    const run = () =>
+      execFile(process.execPath, [path.join(skill, 'scripts/skill.mjs'), '--help'], { cwd: root });
+    await expect(run()).rejects.toMatchObject({
+      code: 7,
+      stdout: expect.stringContaining('["--help"]'),
+    });
+    await fsp.unlink(cli);
+    await expect(run()).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('缺少下载器产物'),
+    });
+  } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { commandAvailable, stateDirectory } from './skill-environment';
+import { commandAvailable, stateDirectory } from '../scripts/skill-environment.mjs';
 
 describe('Skill 环境', () => {
   it('按系统选择包外状态目录并忽略相对环境变量', () => {

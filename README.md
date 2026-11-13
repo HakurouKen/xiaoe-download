@@ -81,10 +81,12 @@ pnpm test:e2e
 
 单元测试覆盖递归分页、文件名冲突、媒体及签名图文解析、全文权限、文档下载权限、Cookie 缓存、域和路径限制、认证刷新并发去重及浏览器断开。集成测试通过真实 ffmpeg 生成音频和 AES-128 HLS，验证媒体下载、编号、占位升级、原图及附件本地化、原文档下载、错误响应拒绝、跳过、损坏恢复、中断发布恢复和未知文件冲突保护。Oxlint 允许循环中的顺序 await，因为分页、重试和按资源保存清单依赖前一步结果；HLS 分片独立采用受限并发。
 
-`scripts/probe-chrome.ts` 是开发用 Chrome MCP 连接检查脚本，生产下载不启动 MCP 服务。
+CLI 使用唯一自包含构建，运行产物及依赖许可声明位于 `dist/`，构建约定见 [build/README.md](build/README.md)。生产下载不启动 MCP 服务。
 
 ## 标准 Skill 分发
 
 从 [GitHub Releases](https://github.com/HakurouKen/xiaoe-download/releases) 下载明确版本的 `xiaoe-download-skill-v<版本号>.zip` 及 `.zip.sha256`，核对 SHA-256 后解压，将完整 `xiaoe-download/` 安装到所用 Agent 的 Skill 目录。包内随附自包含下载器，不需要用户克隆项目、运行 pnpm 或安装 npm 依赖；Node.js 24、媒体工具与 Chrome 仍由用户环境提供。升级时替换整个 Skill 目录，保留包外用户状态和下载目录。
 
-仓库中的 `skills/xiaoe-download/` 只保存手写源文件，不能直接复制运行；GitHub 自动生成的 Source code ZIP 也不是安装包。维护者运行 `pnpm package:skill` 在 `dist/` 构建并生成分发附件；版本 tag 工作流验收后创建草稿 Release，由人工正式发布。安装、构建、发布流程及实际验证情况见 [skills/README.md](skills/README.md)。
+Skill 是核心下载器的附加项：`skills/xiaoe-download/scripts/` 维护手写、仅依赖 Node 内置模块的 `.mjs`，通过子进程调用 CLI；`references/downloader` 在源码树中软链接到 `dist/`。本地先运行 `pnpm build`，不能脱离项目直接复制源码目录使用；GitHub 自动生成的 Source code ZIP 也不是安装包。
+
+维护者运行 `pnpm release` 展开指定软链接并打包，不重新构建或联网；版本 tag 工作流单独验收 Skill 后创建草稿 Release，由人工正式发布。核心检查和集成测试不依赖 Skill。安装、发布流程及实际验证情况见 [skills/README.md](skills/README.md)。

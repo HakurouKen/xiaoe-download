@@ -13,8 +13,8 @@ import path from 'node:path';
 export function stateDirectory(
   platform = process.platform,
   home = os.homedir(),
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+  env = process.env,
+) {
   const paths = platform === 'win32' ? path.win32 : path.posix;
   if (platform === 'win32') {
     const base = env.LOCALAPPDATA;
@@ -36,7 +36,7 @@ export function stateDirectory(
  * @param storeUrl 目标店铺 URL。
  * @returns 当前用户状态目录中的 Cookie 文件路径。
  */
-export function skillCookieCache(storeUrl: string): string {
+export function skillCookieCache(storeUrl) {
   const key = crypto
     .createHash('sha256')
     .update(new URL(storeUrl).origin)
@@ -50,14 +50,14 @@ export function skillCookieCache(storeUrl: string): string {
  * @param args 检查参数。
  * @returns 是否正常执行并以零状态退出。
  */
-export async function commandAvailable(executable: string, args: string[]): Promise<boolean> {
+export async function commandAvailable(executable, args) {
   return new Promise((resolve) => {
     const child = cp.spawn(executable, args, { stdio: 'ignore' });
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       resolve(false);
     }, 10000);
-    const finish = (ready: boolean) => {
+    const finish = (ready) => {
       clearTimeout(timer);
       resolve(ready);
     };
@@ -71,7 +71,7 @@ export async function commandAvailable(executable: string, args: string[]): Prom
  * @returns 消除符号链接后的绝对目录。
  * @throws 父目录无法访问或解析时抛错。
  */
-export async function canonicalDirectory(directory: string): Promise<string> {
+export async function canonicalDirectory(directory) {
   try {
     return await fsp.realpath(directory);
   } catch (error) {
@@ -87,7 +87,7 @@ export async function canonicalDirectory(directory: string): Promise<string> {
  * @returns 准备完成的状态目录。
  * @throws 无法创建目录或限制目录访问时抛错。
  */
-export async function prepareStateDirectory(): Promise<string> {
+export async function prepareStateDirectory() {
   const directory = stateDirectory();
   await fsp.mkdir(directory, { recursive: true, mode: 0o700 });
   if (process.platform === 'win32') {

@@ -30,8 +30,12 @@ jobs:
       - name: Install media tools
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: pnpm check
-      - name: Full Linux regression against packaged Skill
+      - name: Core Linux regression
         run: pnpm exec vitest run --config vitest.e2e.config.ts
+      - name: Package Skill without rebuilding
+        run: pnpm release
+      - name: Skill and release regression against final ZIP
+        run: pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: skill-release
@@ -61,7 +65,7 @@ jobs:
           name: skill-release
           path: dist/release
       - name: Test the same ZIP without rebuilding
-        run: pnpm test:skill-package
+        run: pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs skills/xiaoe-download/tests/package.e2e.mjs
 
   draft-release:
     needs: [build, smoke]
@@ -86,4 +90,4 @@ jobs:
         with:
           name: skill-release
           path: dist/release
-      - run: pnpm release:skill
+      - run: pnpm release --upload

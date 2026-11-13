@@ -1,7 +1,9 @@
 #!/usr/bin/env node
+import cp from 'node:child_process';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import util from 'node:util';
+import url from 'node:url';
 
 import {
   canonicalDirectory,
@@ -9,9 +11,39 @@ import {
   prepareStateDirectory,
   skillCookieCache,
   stateDirectory,
-} from './skill-environment';
+} from './skill-environment.mjs';
 
-async function main(): Promise<void> {
+async function runDownloader(args) {
+  const filename = url.fileURLToPath(new URL('../references/downloader/cli.mjs', import.meta.url));
+  try {
+    await fsp.access(filename);
+  } catch {
+    throw new Error('缺少下载器产物，请安装完整 Release 包；源码环境先运行 pnpm build');
+  }
+  await new Promise((resolve, reject) => {
+    const child = cp.spawn(process.execPath, [filename, ...args], { stdio: 'inherit' });
+    const forward = (signal) => child.kill(signal);
+    const interrupt = () => forward('SIGINT');
+    const terminate = () => forward('SIGTERM');
+    process.on('SIGINT', interrupt);
+    process.on('SIGTERM', terminate);
+    const cleanup = () => {
+      process.off('SIGINT', interrupt);
+      process.off('SIGTERM', terminate);
+    };
+    child.once('error', (error) => {
+      cleanup();
+      reject(error);
+    });
+    child.once('close', (code, signal) => {
+      cleanup();
+      process.exitCode = code ?? (signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : 1);
+      resolve();
+    });
+  });
+}
+
+async function main() {
   const { values, positionals } = util.parseArgs({
     allowPositionals: true,
     options: {
@@ -34,8 +66,7 @@ async function main(): Promise<void> {
     console.log(
       'Skill 入口：node <skill目录>/scripts/skill.mjs --doctor [--cdp 地址]\n准备目录：--prepare --output <绝对路径>\n下载：<all|list|course|media> [目标] --url <购买记录URL> --output <绝对路径> [CLI选项]\n外部环境：Node.js 24；媒体需要 ffmpeg、ffprobe；首次认证需要已登录 Chrome CDP。\nSkill 强制指定包外绝对输出路径，自动管理用户缓存，不接受 --cookie-cache。\n下面是底层 cli.mjs 的选项，默认 downloads 和自定义缓存仅适用于直接调用 cli.mjs：',
     );
-    process.argv = [process.argv[0] ?? 'node', 'cli', '--help'];
-    await import(new URL('./cli.mjs', import.meta.url).href);
+    await runDownloader(['--help']);
     return;
   }
   const nodeReady = Number(process.versions.node.split('.')[0]) === 24;
@@ -43,7 +74,7 @@ async function main(): Promise<void> {
   if (values.doctor) {
     const ffmpeg = await commandAvailable(values.ffmpeg ?? 'ffmpeg', ['-version']);
     const ffprobe = await commandAvailable(values.ffprobe ?? 'ffprobe', ['-version']);
-    let cdp: string = '未检查；缓存有效时无需 Chrome，首次或刷新登录态需用户开启调试并允许连接';
+    let cdp = '未检查；缓存有效时无需 Chrome，首次或刷新登录态需用户开启调试并允许连接';
     const endpoint = values.cdp;
     if (endpoint && /^https?:/.test(endpoint)) {
       try {
@@ -77,13 +108,16 @@ async function main(): Promise<void> {
     throw new Error('请先确认并指定 --output 绝对路径');
   const skillRoot = await canonicalDirectory(path.resolve(import.meta.dirname, '..'));
   const output = await canonicalDirectory(path.resolve(values.output));
+  const downloaderRoot = await canonicalDirectory(path.join(skillRoot, 'references', 'downloader'));
   for (const directory of [output, await canonicalDirectory(stateDirectory())]) {
-    const relative = path.relative(skillRoot, directory);
-    if (
-      !relative ||
-      (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
-    )
-      throw new Error('下载和用户状态目录必须位于 Skill 安装目录之外');
+    for (const protectedRoot of [skillRoot, downloaderRoot]) {
+      const relative = path.relative(protectedRoot, directory);
+      if (
+        !relative ||
+        (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
+      )
+        throw new Error('下载和用户状态目录必须位于 Skill 安装目录之外');
+    }
   }
   if (values['cookie-cache'])
     throw new Error(
@@ -113,15 +147,10 @@ async function main(): Promise<void> {
   )
     throw new Error('缺少 ffmpeg 或 ffprobe；请在获得用户许可后安装，或指定可执行文件绝对路径');
   await prepareStateDirectory();
-  process.argv = [
-    ...process.argv.filter((arg) => arg !== '--doctor' && arg !== '--prepare'),
-    '--cookie-cache',
-    skillCookieCache(url),
-  ];
-  await import(new URL('./cli.mjs', import.meta.url).href);
+  await runDownloader([...process.argv.slice(2), '--cookie-cache', skillCookieCache(url)]);
 }
 
-main().catch((error: unknown) => {
+main().catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 });

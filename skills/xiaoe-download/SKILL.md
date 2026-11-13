@@ -32,4 +32,4 @@ node "<skill目录>/scripts/skill.mjs" course "<课程ID或同店铺URL>" --url 
 
 重跑可恢复完整资源，失败的 HLS 分片不持久缓存。发现 `.xiaoe.lock` 时确认旧任务已停止，获得用户同意后才清理；不删除运行中任务的锁。读取清单和查看文件即可判断结果，避免无依据宣称内容完整。
 
-升级时替换整个 Skill 目录，保留包外用户状态及输出目录。随附第三方许可证见 `references/third-party-licenses.txt`。按 macOS、Linux、Windows 设计；Linux 和 Windows 的实际运行尚未验证。仅标准 Skill 交付，不依赖 Agent 专有工具。
+升级时替换整个 Skill 目录，保留包外用户状态及输出目录。随附下载器和第三方许可证位于 `references/downloader/`。按 macOS、Linux、Windows 设计；Linux 和 Windows 的实际运行尚未验证。仅标准 Skill 交付，不依赖 Agent 专有工具。
