@@ -7,15 +7,16 @@ Skill 只负责环境准备、目标确认、调用下载器和解释结果；�
 ```text
 skills/xiaoe-download/
   SKILL.md
-  scripts/skill.mjs
+  scripts/download.mjs
+  scripts/prepare.mjs
   scripts/doctor.mjs
   scripts/skill-environment.mjs
   references/downloader -> ../../../dist
   tests/
 ```
 
-- `scripts/` 是手写并提交 Git 的 `.mjs`，只导入 Node 内置模块及同目录模块，不参与 TypeScript 打包。入口以子进程执行 `references/downloader/cli.mjs`，传递参数、继承日志并传播退出状态，不修改父进程参数或动态导入核心 CLI。
-- `doctor.mjs` 独立返回只读检查报告，`skill.mjs` 通过 `--doctor` 分支调用并输出 JSON；不新增命令入口，不读取 Cookie 或默认连接环境变量中的调试地址。
+- `scripts/` 是手写并提交 Git 的 `.mjs`，只导入 Node 内置模块及同目录模块，不参与 TypeScript 打包。`download.mjs` 以子进程执行 `references/downloader/cli.mjs`，传递参数、继承日志并传播退出状态，不修改父进程参数或动态导入核心 CLI。
+- 三个独立入口各自解析所需参数：`doctor.mjs` 输出只读环境报告，`prepare.mjs` 准备包外目录，`download.mjs` 检查下载条件并调用 CLI。共享工具维护在 `skill-environment.mjs`；删除原统一入口及其模式开关，不保留兼容转发。Doctor 不读取 Cookie 或默认连接环境变量中的调试地址。
 - `references/downloader` 在源码树中引用唯一主构建的产物。维护者先运行 `pnpm build` 后可本地使用；直接复制源码目录、仅拉取 Skill 子目录或清理 `dist/` 都不能得到独立可运行包。Windows 源码检出不承诺软链接开箱即用。
 - 主构建生成 CLI、全部共享 chunk 和一份第三方许可声明；Skill 不另行收集或复制许可声明。构建与依赖内联约定见 [build/README.md](../build/README.md)。
 - Release 包中指定链接展开为真实文件，用户不需要项目源码、pnpm、npm 依赖或创建软链接。Node.js 24、ffmpeg、ffprobe 和 Chrome 不随包交付。
@@ -61,3 +62,5 @@ SHA-256 检测损坏及附件配对错误，不是独立签名或来源认证。
 2026-11-13 / macOS / Node.js 24.17.0：核心 `pnpm check` 通过（22 个单元测试），核心媒体/文档集成回归通过（2 个测试），Skill 专用验收通过（11 个测试）。验证涵盖指定链接展开、ZIP 白名单及系统解压、包外含空格路径、状态隔离、模拟扫描及浏览器握手、子进程参数和退出码传递、缺失产物提示、草稿重试和正式版本拒绝覆盖。源码软链接从无关工作目录启动、版本/tag 拒绝门禁及系统 ZIP 完整性检查通过；工作流通过 actionlint 静态检查。
 
 本次未推送 tag、创建 Release 或执行远端工作流。Linux、Windows 实际运行仍待 CI，不将矩阵配置视为已经验证通过；不读取个人 Cookie 或连接现有 Chrome。
+
+多入口拆分验收：lint、TypeScript 检查和打包通过，13 个 Skill 测试通过。最终包分别执行 doctor、prepare 和 download，覆盖独立参数解析、包外目录保护、合成状态扫描和子进程退出码；不再提供统一入口或 `--doctor`、`--prepare` 模式开关。

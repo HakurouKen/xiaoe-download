@@ -105,3 +105,34 @@ export async function prepareStateDirectory() {
   } else await fsp.chmod(directory, 0o700);
   return directory;
 }
+
+/** 检查运行时版本。
+ * @throws Node.js 主版本不是 24 时抛错。
+ */
+export function requireNode24() {
+  if (Number(process.versions.node.split('.')[0]) !== 24)
+    throw new Error('需要 Node.js 24，请在获得用户许可后安装并重试');
+}
+
+/** 校验输出和状态目录均位于 Skill 及下载器引用的真实目录之外，不创建目录。
+ * @param value 用户指定的输出目录。
+ * @returns 解析后的包外绝对输出路径。
+ * @throws 路径不是绝对路径、无法解析或位于受保护目录内时抛错。
+ */
+export async function checkedOutput(value) {
+  if (!value || !path.isAbsolute(value)) throw new Error('请先确认并指定 --output 绝对路径');
+  const skillRoot = await canonicalDirectory(path.resolve(import.meta.dirname, '..'));
+  const output = await canonicalDirectory(path.resolve(value));
+  const downloaderRoot = await canonicalDirectory(path.join(skillRoot, 'references', 'downloader'));
+  for (const directory of [output, await canonicalDirectory(stateDirectory())]) {
+    for (const protectedRoot of [skillRoot, downloaderRoot]) {
+      const relative = path.relative(protectedRoot, directory);
+      if (
+        !relative ||
+        (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
+      )
+        throw new Error('下载和用户状态目录必须位于 Skill 安装目录之外');
+    }
+  }
+  return output;
+}

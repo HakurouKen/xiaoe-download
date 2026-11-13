@@ -72,7 +72,9 @@ export async function packSkill(project: string, filename: string): Promise<stri
     }
     for (const required of [
       'SKILL.md',
-      'scripts/skill.mjs',
+      'scripts/doctor.mjs',
+      'scripts/prepare.mjs',
+      'scripts/download.mjs',
       'scripts/skill-environment.mjs',
       'references/downloader/cli.mjs',
       'references/downloader/third-party-licenses.txt',

@@ -104,41 +104,52 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     const downloaderFiles = await fsp.readdir(path.join(skill, 'references/downloader'));
     expect(downloaderFiles).toContain('third-party-licenses.txt');
     expect(downloaderFiles.some((name) => name.endsWith('.map'))).toBe(false);
-    const run = (args, overrides = {}) =>
-      execFile(process.execPath, [path.join(skill, 'scripts', 'skill.mjs'), ...args], {
+    expect((await fsp.readdir(path.join(skill, 'scripts'))).sort()).toEqual([
+      'doctor.mjs',
+      'download.mjs',
+      'prepare.mjs',
+      'skill-environment.mjs',
+    ]);
+    const run = (entry, args, overrides = {}) =>
+      execFile(process.execPath, [path.join(skill, 'scripts', `${entry}.mjs`), ...args], {
         cwd: root,
         env: { ...env, ...overrides },
         timeout: 30000,
       });
-    expect((await run(['--help'])).stdout).toContain('环境');
+    expect((await run('download', ['--help'])).stdout).toContain('环境');
     const doctor = JSON.parse(
-      (await run(['--doctor', '--ffmpeg', 'missing-ffmpeg', '--ffprobe', 'missing-ffprobe']))
-        .stdout,
+      (await run('doctor', ['--ffmpeg', 'missing-ffmpeg', '--ffprobe', 'missing-ffprobe'])).stdout,
     );
     expect(doctor).toMatchObject({ ffmpeg: false, ffprobe: false, prepared: false });
     await expect(fsp.access(home)).rejects.toThrow();
-    await expect(run(['list', '--output', output])).rejects.toMatchObject({
+    for (const entry of ['doctor', 'prepare']) {
+      expect((await run(entry, ['--help'])).stdout).toContain(entry);
+      await expect(run(entry, ['list'])).rejects.toMatchObject({ code: 1 });
+    }
+    for (const flag of ['--doctor', '--prepare'])
+      await expect(run('download', [flag])).rejects.toMatchObject({ code: 1 });
+    await expect(run('download', ['list', '--output', output])).rejects.toMatchObject({
       stderr: expect.stringContaining('店铺'),
     });
-    await expect(run(['--prepare', '--output', 'relative'])).rejects.toMatchObject({
+    await expect(run('prepare', ['--output', 'relative'])).rejects.toMatchObject({
       stderr: expect.stringContaining('绝对路径'),
     });
+    await expect(run('prepare', ['--output', path.join(skill, 'downloads')])).rejects.toMatchObject(
+      { stderr: expect.stringContaining('之外') },
+    );
     await expect(
-      run(['--prepare', '--output', path.join(skill, 'downloads')]),
+      run('prepare', ['--output', path.join(skill, 'references/downloader/downloads')]),
     ).rejects.toMatchObject({ stderr: expect.stringContaining('之外') });
-    await expect(
-      run(['--prepare', '--output', path.join(skill, 'references/downloader/downloads')]),
-    ).rejects.toMatchObject({ stderr: expect.stringContaining('之外') });
-    await run(['--prepare', '--output', output]);
+    await run('prepare', ['--output', output]);
     const state = stateDirectory(process.platform, home, env);
     if (process.platform !== 'win32') expect((await fsp.stat(state)).mode & 0o777).toBe(0o700);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('测试服务器未启动');
     const origin = `http://127.0.0.1:${address.port}`;
-    await run(['--doctor'], { XIAOE_CDP_URL: origin });
+    await run('doctor', [], { XIAOE_CDP_URL: origin });
     expect(debugRequests).toBe(0);
-    await run(['--doctor', '--cdp', origin]);
+    await run('doctor', ['--cdp', origin]);
     expect(debugRequests).toBe(1);
     const key = crypto.createHash('sha256').update(origin).digest('hex').slice(0, 24);
     await fsp.mkdir(path.join(state, 'cookies'), { recursive: true });
@@ -161,7 +172,7 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
         ],
       }),
     );
-    const scanned = await run([
+    const scanned = await run('download', [
       'list',
       '--url',
       `${origin}/record`,
@@ -178,7 +189,7 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     expect(await fsp.readdir(skill)).not.toContain('node_modules');
     expect((await fsp.readdir(skill)).sort()).toEqual(['SKILL.md', 'references', 'scripts']);
     await expect(
-      run([
+      run('download', [
         'list',
         '--url',
         `${origin}/record`,
@@ -193,7 +204,15 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     expect(upgraded).toBe(true);
     await expect(fsp.access(path.join(output, '.xiaoe.lock'))).rejects.toThrow();
     await expect(
-      run(['all', '--url', `${origin}/record`, '--output', output, '--ffmpeg', 'missing-ffmpeg']),
+      run('download', [
+        'all',
+        '--url',
+        `${origin}/record`,
+        '--output',
+        output,
+        '--ffmpeg',
+        'missing-ffmpeg',
+      ]),
     ).rejects.toMatchObject({ stderr: expect.stringContaining('缺少 ffmpeg') });
   } finally {
     await new Promise((resolve) => server.close(() => resolve()));
@@ -213,7 +232,9 @@ it('辅助入口通过子进程调用 CLI，传递参数及原始退出码，缺
       'console.log(JSON.stringify(process.argv.slice(2))); process.exitCode = 7;',
     );
     const run = () =>
-      execFile(process.execPath, [path.join(skill, 'scripts/skill.mjs'), '--help'], { cwd: root });
+      execFile(process.execPath, [path.join(skill, 'scripts/download.mjs'), '--help'], {
+        cwd: root,
+      });
     await expect(run()).rejects.toMatchObject({
       code: 7,
       stdout: expect.stringContaining('["--help"]'),

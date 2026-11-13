@@ -29,7 +29,13 @@ it.skipIf(process.platform === 'win32')(
       await fsp.mkdir(path.join(skill, 'references'));
       await fsp.mkdir(dist);
       await fsp.symlink('../../../dist', path.join(skill, 'references/downloader'));
-      for (const name of ['SKILL.md', 'scripts/skill.mjs', 'scripts/skill-environment.mjs'])
+      for (const name of [
+        'SKILL.md',
+        'scripts/doctor.mjs',
+        'scripts/prepare.mjs',
+        'scripts/download.mjs',
+        'scripts/skill-environment.mjs',
+      ])
         await fsp.writeFile(path.join(skill, name), name);
       for (const name of ['cli.mjs', 'shared.mjs', 'third-party-licenses.txt', 'cli.mjs.map'])
         await fsp.writeFile(path.join(dist, name), name);
@@ -45,8 +51,10 @@ it.skipIf(process.platform === 'win32')(
         'xiaoe-download/references/downloader/cli.mjs',
         'xiaoe-download/references/downloader/shared.mjs',
         'xiaoe-download/references/downloader/third-party-licenses.txt',
+        'xiaoe-download/scripts/doctor.mjs',
+        'xiaoe-download/scripts/download.mjs',
+        'xiaoe-download/scripts/prepare.mjs',
         'xiaoe-download/scripts/skill-environment.mjs',
-        'xiaoe-download/scripts/skill.mjs',
       ]);
       expect(await fsp.readdir(path.join(dist, 'release'))).toEqual([
         filename,
