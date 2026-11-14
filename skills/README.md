@@ -32,7 +32,7 @@ Cookie 按店铺隔离，保存在系统对应的用户私有状态目录；输�
 
 ## 打包与验收
 
-主项目构建完成后运行 `pnpm release`。根目录唯一的 `scripts/release.ts` 默认仅打包，不重新构建、执行测试或联网；维护者打包环境支持 macOS、Linux，需要系统 `zip`，验收需要 `unzip`。Windows 用户安装最终 ZIP 不要求支持本地发布。
+主项目构建完成后运行 `pnpm release`。根目录唯一的 `scripts/release.ts` 只负责打包，不重新构建、执行测试或联网；维护者打包环境支持 macOS、Linux，需要系统 `zip`，验收需要 `unzip`。Windows 用户安装最终 ZIP 不要求支持本地发布。
 
 发布脚本只展开 `references/downloader` 指向本项目 `dist/` 的链接，其他符号链接及特殊文件拒绝交付。打包选择 `SKILL.md`、手写 `scripts/*.mjs`、引用中的全部根级 `.mjs` 和许可声明，以及 `references/` 中允许的 Markdown/文本资源；隐藏文件、路径逃逸及 `node_modules` 被拒绝。测试、源码映射及历史附件不会进入包。新增资源类型需显式调整交付边界。
 
@@ -45,13 +45,21 @@ pnpm release
 pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs
 ```
 
-Skill 测试校验 SHA-256，用系统解压器解压最终 ZIP 到含空格的包外路径，验证环境检查、状态权限、模拟扫描、WebSocket 握手及错误退出状态；Windows 使用 PowerShell `Expand-Archive`，不依赖仓库软链接。打包和草稿状态测试也归属此目录。可用 `SKILL_RELEASE_DIR` 指定待验收附件目录。
+Skill 测试校验 SHA-256，用系统解压器解压最终 ZIP 到含空格的包外路径，验证环境检查、状态权限、模拟扫描、WebSocket 握手及错误退出状态；Windows 使用 PowerShell `Expand-Archive`，不依赖仓库软链接。打包和工作流离线发布分支测试也归属此目录。可用 `SKILL_RELEASE_DIR` 指定待验收附件目录。
 
 ## 发布与安装
 
-Skill 与主项目共用稳定三段版本号。维护者提交版本变更后推送对应 `v<版本号>` tag；`.github/workflows/release-skill.yml` 按锁文件安装依赖并依次执行：核心 Linux 检查及媒体回归、打包、Skill 专用测试、同一 ZIP 的 macOS/Linux/Windows 系统解压冒烟。全部门禁通过后才创建或更新草稿 Release，人工正式发布。
+在 GitHub Actions 中选择 `Release` 工作流并在 `main` 手动触发。文件为 `.github/workflows/release.yml`；其他分支或 tag 触发时直接失败，不提供 tag 推送触发。工作流使用触发时固定的提交，运行期间主干前进不会更换发布目标。手动触发需要工作流已存在于仓库默认分支；本地提交尚未推送时不能在远端使用新流程。
 
-`pnpm release --upload` 仅上传已经验收的 ZIP 和校验文件，不重新打包。要求 `RELEASE_TAG`、`GITHUB_REPOSITORY` 和 GitHub 认证，核对版本、校验和及本地/远端 tag 与构建提交的一致性。tag 漂移、未知 Release 状态或已正式发布时失败，不自动移动 tag 或删除 Release。草稿允许在完整验收后重跑覆盖附件；正式版本修复必须使用新版本。人工发布前确认当前工作流已结束，不与草稿上传并发操作。
+项目使用 `package.json` 中已提交的稳定三段版本号，tag 为 `v<版本号>`。工作流不自动升版或生成版本提交；维护者需先提交版本变更，再从主干触发。`release.ts` 仅按项目版本命名 ZIP，不读取发布 tag、GitHub 仓库或认证环境变量，也不提供 `--upload` 模式。
+
+流程顺序为：核心 Linux 检查和媒体回归 → 生成 ZIP/checksum → Skill 专用验收 → 同一 ZIP 的 macOS/Linux/Windows 系统解压冒烟 → 校验待上传附件 → 创建或复用 tag → 上传草稿附件 → 下载比对已上传字节 → 正式发布。所有必需验收通过后才执行远端写操作；只有发布任务获得 `contents: write` 权限，使用工作流内置 token，不要求额外发布密钥。
+
+发布前查询含草稿在内的 Release 状态；API 失败不视为不存在。正式 Release 已存在或状态不明确时停止，不覆盖或删除。已有 tag 仅在指向本次实际测试提交时复用（包括 annotated tag 的提交）；不同提交直接失败，不移动或删除 tag。tag 不存在时显式创建并推送到本次验收提交，然后创建草稿。
+
+附件上传或下载比对失败保留 tag 和草稿，不自动回滚；允许重新经过完整验收后替换草稿附件。确认下载的 ZIP/checksum 与验收产物完全一致后自动正式发布，不再等待人工发布。重试应对原运行选择 **Re-run all jobs**，确保完整门禁重跑；仅重跑失败发布任务会复用原运行已通过验收的附件，而不是重新验收。若从主干新提交重新触发且版本未变，已有 tag 指向旧提交会拒绝发布，需更新版本。
+
+使用仓库内固定并发组 `release`，同一时刻只执行一个该工作流，不取消运行中的任务。GitHub Actions 并发组不保证排队顺序且可能替换较早的待运行任务，不作为可靠发布队列；以实际运行状态为准。手工操作和其他工作流不受该并发组约束，发布期间不要同时移动 tag、正式发布或修改同一草稿。
 
 用户从 [GitHub Releases](https://github.com/HakurouKen/xiaoe-download/releases) 下载明确版本的 `xiaoe-download-skill-v<版本号>.zip` 及 `.zip.sha256`，核对 SHA-256 后使用系统工具解压，将完整 `xiaoe-download/` 安装到 Agent 的 Skill 目录。自动生成的 Source code 归档不是安装包。用户无需安装 `gh`；已有 `gh` 时可按 tag 和附件名下载。
 
@@ -64,3 +72,5 @@ SHA-256 检测损坏及附件配对错误，不是独立签名或来源认证。
 本次未推送 tag、创建 Release 或执行远端工作流。Linux、Windows 实际运行仍待 CI，不将矩阵配置视为已经验证通过；不读取个人 Cookie 或连接现有 Chrome。
 
 多入口拆分验收：lint、TypeScript 检查和打包通过，13 个 Skill 测试通过。最终包分别执行 doctor、prepare 和 download，覆盖独立参数解析、包外目录保护、合成状态扫描和子进程退出码；不再提供统一入口或 `--doctor`、`--prepare` 模式开关。
+
+2026-11-14 / macOS / Node.js 24.17.0：工作流职责调整后 `pnpm check` 通过（22 个核心单元测试），核心集成回归通过（2 个测试），打包及 Skill 专用验收通过（10 个测试）。发布分支使用本地 Git/gh 模拟器执行工作流原始 Bash，覆盖首次发布、同提交草稿恢复、已正式发布、tag 提交不一致、API/远端查询/推送/创建/上传/下载失败及附件损坏共 12 个场景；失败场景均未正式发布。main 分支限制、版本输出及删除 `--upload` 模式的本地检查通过，工作流通过 actionlint。未实际执行远端 tag 或 Release 操作，仓库权限及三平台运行仍需远端验收。

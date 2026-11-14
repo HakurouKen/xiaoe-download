@@ -1,0 +1,153 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Require main dispatch
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: test "$RELEASE_REF" = refs/heads/main
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Read committed version
+        id: version
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (typeof version !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
+            throw new Error('Release requires a stable three-part version');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=v${version}\n`);
+          JS
+      - name: Install media tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pnpm check
+      - name: Core Linux regression
+        run: pnpm exec vitest run --config vitest.e2e.config.ts
+      - name: Package Skill without rebuilding
+        run: pnpm release
+      - name: Skill and release regression against final ZIP
+        run: pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skill-release
+          path: dist/release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: skill-release
+          path: dist/release
+      - name: Test the same ZIP without rebuilding
+        run: pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs skills/xiaoe-download/tests/package.e2e.mjs
+
+  publish:
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.build.outputs.tag }}
+      RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@v4
+        with:
+          name: skill-release
+          path: dist/release
+      - name: Validate tested attachments
+        working-directory: dist/release
+        run: |
+          test "$(node -p "'v' + require('../../package.json').version")" = "$RELEASE_TAG"
+          archive="xiaoe-download-skill-${RELEASE_TAG}.zip"
+          test -s "$archive"
+          test -s "$archive.sha256"
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 2
+          printf '%s  %s\n' "$(sha256sum "$archive" | cut -d ' ' -f 1)" "$archive" > expected.sha256
+          cmp expected.sha256 "$archive.sha256"
+          rm expected.sha256
+      - name: Create tag and publish tested release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+
+          # List releases so drafts are visible; API failures must not mean "absent".
+          state=$(gh api --paginate "repos/$GH_REPO/releases" \
+            --jq '.[] | select(.tag_name == env.RELEASE_TAG) | .draft')
+          if [ -n "$state" ] && [ "$state" != true ]; then
+            echo "Release is already published or has an invalid state; use a new version" >&2
+            exit 1
+          fi
+
+          remote_tag=$(git ls-remote --refs origin "refs/tags/$RELEASE_TAG")
+          if [ -n "$remote_tag" ]; then
+            git fetch origin "refs/tags/$RELEASE_TAG"
+            test "$(git rev-parse 'FETCH_HEAD^{commit}')" = "$RELEASE_SHA"
+          else
+            git tag "$RELEASE_TAG" "$RELEASE_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+
+          if [ -z "$state" ]; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --target "$RELEASE_SHA" --title "$RELEASE_TAG" --generate-notes
+          fi
+          archive="dist/release/xiaoe-download-skill-${RELEASE_TAG}.zip"
+          gh release upload "$RELEASE_TAG" "$archive" "$archive.sha256" --clobber
+
+          # Verify the actual uploaded bytes before making the draft public.
+          verify_dir=$(mktemp -d)
+          trap 'rm -rf "$verify_dir"' EXIT
+          gh release download "$RELEASE_TAG" --dir "$verify_dir" \
+            --pattern "xiaoe-download-skill-${RELEASE_TAG}.zip*"
+          cmp "$archive" "$verify_dir/$(basename "$archive")"
+          cmp "$archive.sha256" "$verify_dir/$(basename "$archive").sha256"
+          gh release edit "$RELEASE_TAG" --draft=false

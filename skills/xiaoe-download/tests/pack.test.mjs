@@ -10,9 +10,8 @@ import { archiveName, checksum, packSkill } from '../../../scripts/release';
 
 const execFile = util.promisify(cp.execFile);
 
-it('版本化附件严格匹配稳定版本及 tag', () => {
-  expect(archiveName('0.1.0', 'v0.1.0')).toBe('xiaoe-download-skill-v0.1.0.zip');
-  expect(() => archiveName('0.1.0', 'v0.2.0')).toThrow('tag');
+it('版本化附件严格匹配稳定版本', () => {
+  expect(archiveName('0.1.0')).toBe('xiaoe-download-skill-v0.1.0.zip');
   for (const version of ['../secret', '01.1.0', '1.0.0-beta.1'])
     expect(() => archiveName(version)).toThrow('版本');
 });

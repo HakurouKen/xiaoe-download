@@ -99,16 +99,14 @@ export async function packSkill(project: string, filename: string): Promise<stri
   }
 }
 
-/** 根据项目版本确定附件名，并核对发布 tag。
+/** 根据项目版本确定附件名。
  * @param version 项目版本。
- * @param tag 可选的发布 tag。
  * @returns 版本化 ZIP 文件名。
- * @throws 版本格式无效或 tag 与版本不匹配时抛错。
+ * @throws 版本格式无效时抛错。
  */
-export function archiveName(version: string, tag?: string): string {
+export function archiveName(version: string): string {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
     throw new Error('Skill 发布需要稳定的三段版本号');
-  if (tag !== undefined && tag !== `v${version}`) throw new Error(`发布 tag 必须为 v${version}`);
   return `xiaoe-download-skill-v${version}.zip`;
 }
 
@@ -121,53 +119,6 @@ export function checksum(archive: Uint8Array, filename: string): string {
   return `${crypto.createHash('sha256').update(archive).digest('hex')}  ${filename}\n`;
 }
 
-/** 仅创建或更新草稿 Release，拒绝覆盖正式版本。
- * @param tag 已核验的发布 tag。
- * @param repo 目标 GitHub 仓库。
- * @param files 已验收的附件路径。
- * @param gh 执行 GitHub CLI 并返回标准输出的函数。
- * @returns 本次创建或更新的动作。
- * @throws 正式版本已存在、响应无效或 GitHub 操作失败时抛错。
- */
-export async function uploadDraft(
-  tag: string,
-  repo: string,
-  files: string[],
-  gh: (args: string[]) => Promise<string>,
-): Promise<'created' | 'updated'> {
-  let release: unknown;
-  try {
-    release = JSON.parse(await gh(['api', `repos/${repo}/releases/tags/${tag}`]));
-  } catch (error) {
-    if (
-      !error ||
-      typeof error !== 'object' ||
-      !('stderr' in error) ||
-      typeof error.stderr !== 'string' ||
-      !error.stderr.includes('(HTTP 404)')
-    )
-      throw error;
-    await gh([
-      'release',
-      'create',
-      tag,
-      ...files,
-      '--repo',
-      repo,
-      '--verify-tag',
-      '--draft',
-      '--generate-notes',
-      '--title',
-      tag,
-    ]);
-    return 'created';
-  }
-  if (!release || typeof release !== 'object' || !('draft' in release) || release.draft !== true)
-    throw new Error('禁止覆盖正式 Release，请发布新版本');
-  await gh(['release', 'upload', tag, ...files, '--repo', repo, '--clobber']);
-  return 'updated';
-}
-
 async function main(): Promise<void> {
   const metadata: unknown = JSON.parse(await fsp.readFile('package.json', 'utf8'));
   if (
@@ -177,36 +128,10 @@ async function main(): Promise<void> {
     typeof metadata.version !== 'string'
   )
     throw new Error('项目版本无效');
-  const { values } = util.parseArgs({ options: { upload: { type: 'boolean' } } });
-  const tag = process.env.RELEASE_TAG;
-  const filename = archiveName(metadata.version, tag);
-  if (!values.upload) {
-    await packSkill(process.cwd(), filename);
-    console.log(`Skill 分发包已生成：dist/release/${filename}`);
-    return;
-  }
-  const repo = process.env.GITHUB_REPOSITORY;
-  if (!tag || !repo || !/^[\w.-]+\/[\w.-]+$/.test(repo))
-    throw new Error('上传必须明确指定 RELEASE_TAG 和 GITHUB_REPOSITORY');
-  const files = [
-    path.join('dist/release', filename),
-    path.join('dist/release', `${filename}.sha256`),
-  ];
-  const archive = await fsp.readFile(files[0] ?? '');
-  if ((await fsp.readFile(files[1] ?? '', 'utf8')) !== checksum(archive, filename))
-    throw new Error('分发包校验失败');
-  const gh = async (args: string[]) => (await execFile('gh', args)).stdout.trim();
-  // 防止验收后远端 tag 被移动，使 Release 指向与构建内容不同的提交。
-  const localTag = (await execFile('git', ['rev-parse', `refs/tags/${tag}`])).stdout.trim();
-  const head = (await execFile('git', ['rev-parse', 'HEAD'])).stdout.trim();
-  const taggedCommit = (await execFile('git', ['rev-parse', `${tag}^{commit}`])).stdout.trim();
-  const remoteTag = await gh(['api', `repos/${repo}/git/ref/tags/${tag}`, '--jq', '.object.sha']);
-  if (localTag !== remoteTag || head !== taggedCommit)
-    throw new Error('发布 tag 与当前构建提交不一致');
-  const action = await uploadDraft(tag, repo, files, gh);
-  console.log(
-    `已${action === 'created' ? '创建' : '更新'}草稿 Release：${tag}，请人工确认后发布。`,
-  );
+  util.parseArgs({ options: {} });
+  const filename = archiveName(metadata.version);
+  await packSkill(process.cwd(), filename);
+  console.log(`Skill 分发包已生成：dist/release/${filename}`);
 }
 
 if (process.argv[1] && import.meta.url === url.pathToFileURL(path.resolve(process.argv[1])).href) {
