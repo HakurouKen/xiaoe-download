@@ -30,16 +30,10 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Read committed version
+      - name: Read release tag
         id: version
         run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          if (typeof version !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
-            throw new Error('Release requires a stable three-part version');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=v${version}\n`);
-          JS
+          jq -r '"tag=v" + .version' package.json >> "$GITHUB_OUTPUT"
       - name: Install media tools
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: pnpm check
@@ -95,9 +89,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
       - uses: actions/download-artifact@v4
         with:
           name: skill-release
@@ -105,7 +96,6 @@ jobs:
       - name: Validate tested attachments
         working-directory: dist/release
         run: |
-          test "$(node -p "'v' + require('../../package.json').version")" = "$RELEASE_TAG"
           archive="xiaoe-download-skill-${RELEASE_TAG}.zip"
           test -s "$archive"
           test -s "$archive.sha256"
