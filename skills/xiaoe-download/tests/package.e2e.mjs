@@ -86,7 +86,7 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          'Expand-Archive -LiteralPath $env.XIAOE_TEST_ZIP -DestinationPath $env.XIAOE_TEST_EXTRACT',
+          'Expand-Archive -LiteralPath $env:XIAOE_TEST_ZIP -DestinationPath $env:XIAOE_TEST_EXTRACT',
         ],
         {
           env: {
