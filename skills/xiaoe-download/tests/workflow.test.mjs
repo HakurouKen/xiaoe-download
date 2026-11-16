@@ -12,7 +12,7 @@ it.skipIf(process.platform === 'win32')(
   '工作流离线验证首次发布、草稿恢复及失败门禁，不执行真实 GitHub 操作',
   async () => {
     const workflow = await fsp.readFile('.github/workflows/release.yml', 'utf8');
-    const block = workflow.split('      - name: Create tag and publish tested release\n')[1];
+    const block = workflow.split('      - name: 创建标签并发布已验收的版本\n')[1];
     const script = block
       .split('        run: |\n')[1]
       .split('\n')

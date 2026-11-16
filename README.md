@@ -89,4 +89,4 @@ CLI 使用唯一自包含构建，运行产物及依赖许可声明位于 `dist/
 
 Skill 是核心下载器的附加项：`skills/xiaoe-download/scripts/` 维护手写、仅依赖 Node 内置模块的 `.mjs`，通过子进程调用 CLI；`references/downloader` 在源码树中软链接到 `dist/`。本地先运行 `pnpm build`，不能脱离项目直接复制源码目录使用；GitHub 自动生成的 Source code ZIP 也不是安装包。
 
-维护者运行 `pnpm release` 展开指定软链接，仅生成 ZIP 和 checksum，不重新构建或联网。在 GitHub Actions 的 `Release` 工作流中选择 `main` 手动触发，工作流对固定提交完成测试、构建及 Skill 验收后打 tag，并正式发布 GitHub Release。核心检查和集成测试不依赖 Skill。安装、发布及失败重跑约定见 [skills/README.md](skills/README.md)。
+维护者运行 `pnpm release` 展开指定软链接，仅生成 ZIP 和 checksum，不重新构建或联网。在 GitHub Actions 的 `发布` 工作流中选择 `main` 手动触发，工作流对固定提交完成测试、构建及 Skill 验收后打 tag，并正式发布 GitHub Release。核心检查和集成测试不依赖 Skill。安装、发布及失败重跑约定见 [skills/README.md](skills/README.md)。

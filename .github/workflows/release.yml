@@ -1,4 +1,4 @@
-name: Release
+name: 发布
 
 on:
   workflow_dispatch:
@@ -12,38 +12,45 @@ concurrency:
 
 jobs:
   build:
+    name: 构建与验收
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.version.outputs.tag }}
     steps:
-      - name: Require main dispatch
+      - name: 确认从 main 分支触发
         env:
           RELEASE_REF: ${{ github.ref }}
         run: test "$RELEASE_REF" = refs/heads/main
-      - uses: actions/checkout@v4
+      - name: 检出发布提交
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@v4
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Read release tag
+      - name: 安装项目依赖
+        run: pnpm install --frozen-lockfile
+      - name: 读取发布标签
         id: version
         run: |
           jq -r '"tag=v" + .version' package.json >> "$GITHUB_OUTPUT"
-      - name: Install media tools
+      - name: 安装媒体工具
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - run: pnpm check
-      - name: Core Linux regression
+      - name: 运行核心检查与构建
+        run: pnpm check
+      - name: 运行核心 Linux 集成回归
         run: pnpm exec vitest run --config vitest.e2e.config.ts
-      - name: Package Skill without rebuilding
+      - name: 使用已有构建打包 Skill
         run: pnpm release
-      - name: Skill and release regression against final ZIP
+      - name: 验收最终 ZIP 与发布流程
         run: pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs
-      - uses: actions/upload-artifact@v4
+      - name: 保存已验收的发布附件
+        uses: actions/upload-artifact@v4
         with:
           name: skill-release
           path: dist/release/*
@@ -51,6 +58,7 @@ jobs:
           retention-days: 7
 
   smoke:
+    name: 跨平台冒烟测试（${{ matrix.os }}）
     needs: build
     strategy:
       fail-fast: false
@@ -58,23 +66,29 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - name: 检出发布提交
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@v4
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v4
+      - name: 安装项目依赖
+        run: pnpm install --frozen-lockfile
+      - name: 下载已验收的发布附件
+        uses: actions/download-artifact@v4
         with:
           name: skill-release
           path: dist/release
-      - name: Test the same ZIP without rebuilding
+      - name: 验证同一份 ZIP 安装包
         run: pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs skills/xiaoe-download/tests/package.e2e.mjs
 
   publish:
+    name: 发布版本
     needs: [build, smoke]
     runs-on: ubuntu-latest
     permissions:
@@ -85,15 +99,17 @@ jobs:
       RELEASE_TAG: ${{ needs.build.outputs.tag }}
       RELEASE_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - name: 检出发布提交
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - name: 下载已验收的发布附件
+        uses: actions/download-artifact@v4
         with:
           name: skill-release
           path: dist/release
-      - name: Validate tested attachments
+      - name: 校验已验收的发布附件
         working-directory: dist/release
         run: |
           archive="xiaoe-download-skill-${RELEASE_TAG}.zip"
@@ -103,17 +119,17 @@ jobs:
           printf '%s  %s\n' "$(sha256sum "$archive" | cut -d ' ' -f 1)" "$archive" > expected.sha256
           cmp expected.sha256 "$archive.sha256"
           rm expected.sha256
-      - name: Create tag and publish tested release
+      - name: 创建标签并发布已验收的版本
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
 
-          # List releases so drafts are visible; API failures must not mean "absent".
+          # 查询包含草稿的版本列表；API 失败不能视为版本不存在。
           state=$(gh api --paginate "repos/$GH_REPO/releases" \
             --jq '.[] | select(.tag_name == env.RELEASE_TAG) | .draft')
           if [ -n "$state" ] && [ "$state" != true ]; then
-            echo "Release is already published or has an invalid state; use a new version" >&2
+            echo "版本已正式发布或状态异常，请使用新版本号" >&2
             exit 1
           fi
 
@@ -133,7 +149,7 @@ jobs:
           archive="dist/release/xiaoe-download-skill-${RELEASE_TAG}.zip"
           gh release upload "$RELEASE_TAG" "$archive" "$archive.sha256" --clobber
 
-          # Verify the actual uploaded bytes before making the draft public.
+          # 正式发布前，下载并逐字节核对已上传的附件。
           verify_dir=$(mktemp -d)
           trap 'rm -rf "$verify_dir"' EXIT
           gh release download "$RELEASE_TAG" --dir "$verify_dir" \
