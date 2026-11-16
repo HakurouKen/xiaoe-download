@@ -1,7 +1,40 @@
 import { expect, it, vi } from 'vitest';
 
+import cp from 'node:child_process';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import util from 'node:util';
+
 import { doctor } from '../scripts/doctor.mjs';
 import { stateDirectory } from '../scripts/skill-environment.mjs';
+
+const execFile = util.promisify(cp.execFile);
+
+it('通过大小写或符号链接别名启动 doctor CLI 时仍输出完整 JSON', async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'doctor cli '));
+  try {
+    await fsp.cp('skills/xiaoe-download/scripts', root, { recursive: true });
+    const entry = path.join(root, 'DOCTOR.mjs');
+    try {
+      await fsp.access(entry);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      // 大小写敏感的文件系统用符号链接别名；Windows 无需创建符号链接。
+      await fsp.symlink('doctor.mjs', entry);
+    }
+    const { stdout } = await execFile(process.execPath, [
+      entry,
+      '--ffmpeg',
+      'xiaoe-missing-ffmpeg',
+      '--ffprobe',
+      'xiaoe-missing-ffprobe',
+    ]);
+    expect(JSON.parse(stdout)).toMatchObject({ ffmpeg: false, ffprobe: false, prepared: false });
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
 
 it('默认检查返回报告且不因调试环境变量联网', async () => {
   const fetch = vi.fn();

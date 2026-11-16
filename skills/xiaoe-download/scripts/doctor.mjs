@@ -54,7 +54,10 @@ async function main() {
   console.log(JSON.stringify(await doctor(values), null, 2));
 }
 
-if (process.argv[1] && import.meta.filename === (await fsp.realpath(process.argv[1]))) {
+if (
+  process.argv[1] &&
+  (await fsp.realpath(import.meta.filename)) === (await fsp.realpath(process.argv[1]))
+) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
