@@ -89,8 +89,6 @@ it.skipIf(process.platform === 'win32')(
       await fsp.symlink(path.join(dist, 'cli.mjs'), path.join(skill, 'scripts/linked.mjs'));
       await expect(packSkill(root, filename)).rejects.toThrow('符号链接');
       await fsp.unlink(path.join(skill, 'scripts/linked.mjs'));
-      await fsp.unlink(path.join(dist, 'cli.mjs'));
-      await expect(packSkill(root, filename)).rejects.toThrow('必要文件');
       await fsp.unlink(path.join(skill, 'references/downloader'));
       await fsp.symlink(root, path.join(skill, 'references/downloader'));
       await expect(packSkill(root, filename)).rejects.toThrow('指向项目 dist');

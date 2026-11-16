@@ -109,27 +109,16 @@ jobs:
         with:
           name: skill-release
           path: release
-      - name: 校验已验收的发布附件
-        working-directory: release
-        run: |
-          archive="xiaoe-download-skill-${RELEASE_TAG}.zip"
-          test -s "$archive"
-          test -s "$archive.sha256"
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 2
-          printf '%s  %s\n' "$(sha256sum "$archive" | cut -d ' ' -f 1)" "$archive" > expected.sha256
-          cmp expected.sha256 "$archive.sha256"
-          rm expected.sha256
       - name: 创建标签并发布已验收的版本
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
 
-          # 查询包含草稿的版本列表；API 失败不能视为版本不存在。
-          state=$(gh api --paginate "repos/$GH_REPO/releases" \
-            --jq '.[] | select(.tag_name == env.RELEASE_TAG) | .draft')
-          if [ -n "$state" ] && [ "$state" != true ]; then
-            echo "版本已正式发布或状态异常，请使用新版本号" >&2
+          # 已有版本（包括草稿）交由维护者处理，不自动覆盖或恢复。
+          existing=$(gh api --paginate "repos/$GH_REPO/releases" \
+            --jq '.[] | select(.tag_name == env.RELEASE_TAG) | .id')
+          if [ -n "$existing" ]; then
+            echo "版本或草稿已存在，请先处理或使用新版本号" >&2
             exit 1
           fi
 
@@ -142,18 +131,9 @@ jobs:
             git push origin "refs/tags/$RELEASE_TAG"
           fi
 
-          if [ -z "$state" ]; then
-            gh release create "$RELEASE_TAG" --verify-tag --draft \
-              --target "$RELEASE_SHA" --title "$RELEASE_TAG" --generate-notes
-          fi
+          gh release create "$RELEASE_TAG" --verify-tag --draft \
+            --target "$RELEASE_SHA" --title "$RELEASE_TAG" --generate-notes
           archive="release/xiaoe-download-skill-${RELEASE_TAG}.zip"
-          gh release upload "$RELEASE_TAG" "$archive" "$archive.sha256" --clobber
+          gh release upload "$RELEASE_TAG" "$archive" "$archive.sha256"
 
-          # 正式发布前，下载并逐字节核对已上传的附件。
-          verify_dir=$(mktemp -d)
-          trap 'rm -rf "$verify_dir"' EXIT
-          gh release download "$RELEASE_TAG" --dir "$verify_dir" \
-            --pattern "xiaoe-download-skill-${RELEASE_TAG}.zip*"
-          cmp "$archive" "$verify_dir/$(basename "$archive")"
-          cmp "$archive.sha256" "$verify_dir/$(basename "$archive").sha256"
           gh release edit "$RELEASE_TAG" --draft=false

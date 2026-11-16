@@ -101,8 +101,18 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     expect((await fsp.lstat(path.join(skill, 'references/downloader'))).isSymbolicLink()).toBe(
       false,
     );
+    for (const required of [
+      'SKILL.md',
+      'scripts/doctor.mjs',
+      'scripts/prepare.mjs',
+      'scripts/download.mjs',
+      'scripts/skill-environment.mjs',
+      'references/downloader/cli.mjs',
+      'references/downloader/third-party-licenses.txt',
+    ]) {
+      expect((await fsp.stat(path.join(skill, required))).size, required).toBeGreaterThan(0);
+    }
     const downloaderFiles = await fsp.readdir(path.join(skill, 'references/downloader'));
-    expect(downloaderFiles).toContain('third-party-licenses.txt');
     expect(downloaderFiles).toContain('cli.mjs.map');
     expect((await fsp.readdir(path.join(skill, 'scripts'))).sort()).toEqual([
       'doctor.mjs',

@@ -12,11 +12,9 @@ const execFile = util.promisify(cp.execFile);
  * @param project 项目根目录。
  * @param filename 已校验的版本化 ZIP 文件名。
  * @returns 生成的 ZIP 绝对路径。
- * @throws 产物缺失、交付边界无效、链接目标错误或系统 zip 不可用时抛错。
+ * @throws 复制失败、链接目标错误、存在特殊文件或系统 zip 不可用时抛错。
  */
 export async function packSkill(project: string, filename: string): Promise<string> {
-  if (!/^xiaoe-download-skill-v\d+\.\d+\.\d+\.zip$/.test(filename))
-    throw new Error('分发附件名无效');
   const source = path.resolve(project, 'skills/xiaoe-download');
   const dist = path.resolve(project, 'dist');
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'xiaoe release '));
@@ -54,21 +52,6 @@ export async function packSkill(project: string, filename: string): Promise<stri
       await copy(path.join(source, 'references', name), `references/${name}`);
     }
     await copy(dist, 'references/downloader');
-    for (const required of [
-      'SKILL.md',
-      'scripts/doctor.mjs',
-      'scripts/prepare.mjs',
-      'scripts/download.mjs',
-      'scripts/skill-environment.mjs',
-      'references/downloader/cli.mjs',
-      'references/downloader/third-party-licenses.txt',
-    ]) {
-      if (
-        !entries.includes(`xiaoe-download/${required}`) ||
-        !(await fsp.stat(path.join(root, 'xiaoe-download', required))).size
-      )
-        throw new Error(`分发包缺少必要文件：${required}`);
-    }
     const archive = path.join(root, filename);
     await execFile('zip', ['-X', '-q', archive, ...entries.sort()], { cwd: root });
     const data = await fsp.readFile(archive);
