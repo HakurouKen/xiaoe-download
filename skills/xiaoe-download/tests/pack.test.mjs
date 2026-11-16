@@ -17,7 +17,7 @@ it('版本化附件严格匹配稳定版本', () => {
 });
 
 it.skipIf(process.platform === 'win32')(
-  '展开指定软链接、保留 chunk，不打包测试、旧附件或源码映射',
+  '完整复制下载器产物，发布附件与构建目录隔离，测试不入包',
   async () => {
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'skill pack '));
     const skill = path.join(root, 'skills/xiaoe-download');
@@ -40,14 +40,19 @@ it.skipIf(process.platform === 'win32')(
         await fsp.writeFile(path.join(dist, name), name);
       await fsp.mkdir(path.join(skill, 'tests'));
       await fsp.writeFile(path.join(skill, 'tests/private.test.mjs'), 'not delivered');
-      await fsp.mkdir(path.join(dist, 'release'));
-      await fsp.writeFile(path.join(dist, 'release/old.zip'), 'stale');
+      await fsp.mkdir(path.join(dist, 'assets'));
+      await fsp.writeFile(path.join(dist, 'assets/config.json'), '{"test":true}');
+      await fsp.mkdir(path.join(root, 'release'));
+      await fsp.writeFile(path.join(root, 'release/old.zip'), 'stale');
       const archive = await packSkill(root, filename);
+      expect(archive).toBe(path.join(root, 'release', filename));
       const data = await fsp.readFile(archive);
       expect(await fsp.readFile(`${archive}.sha256`, 'utf8')).toBe(checksum(data, filename));
       expect((await execFile('unzip', ['-Z1', archive])).stdout.trim().split('\n')).toEqual([
         'xiaoe-download/SKILL.md',
+        'xiaoe-download/references/downloader/assets/config.json',
         'xiaoe-download/references/downloader/cli.mjs',
+        'xiaoe-download/references/downloader/cli.mjs.map',
         'xiaoe-download/references/downloader/shared.mjs',
         'xiaoe-download/references/downloader/third-party-licenses.txt',
         'xiaoe-download/scripts/doctor.mjs',
@@ -55,7 +60,7 @@ it.skipIf(process.platform === 'win32')(
         'xiaoe-download/scripts/prepare.mjs',
         'xiaoe-download/scripts/skill-environment.mjs',
       ]);
-      expect(await fsp.readdir(path.join(dist, 'release'))).toEqual([
+      expect(await fsp.readdir(path.join(root, 'release'))).toEqual([
         filename,
         `${filename}.sha256`,
       ]);
@@ -74,9 +79,13 @@ it.skipIf(process.platform === 'win32')(
           'utf8',
         ),
       ).toBe('shared.mjs');
-      await fsp.writeFile(path.join(skill, 'scripts/.env'), 'secret');
-      await expect(packSkill(root, filename)).rejects.toThrow('非交付');
-      await fsp.unlink(path.join(skill, 'scripts/.env'));
+      expect(
+        await fsp.readFile(
+          path.join(extracted, 'xiaoe-download/references/downloader/assets/config.json'),
+          'utf8',
+        ),
+      ).toBe('{"test":true}');
+      expect(await fsp.readdir(dist)).not.toContain('release');
       await fsp.symlink(path.join(dist, 'cli.mjs'), path.join(skill, 'scripts/linked.mjs'));
       await expect(packSkill(root, filename)).rejects.toThrow('符号链接');
       await fsp.unlink(path.join(skill, 'scripts/linked.mjs'));

@@ -68,7 +68,7 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     );
   });
   try {
-    const release = process.env.SKILL_RELEASE_DIR ?? 'dist/release';
+    const release = process.env.SKILL_RELEASE_DIR ?? 'release';
     const archives = (await fsp.readdir(release)).filter((name) => name.endsWith('.zip'));
     expect(archives).toHaveLength(1);
     const filename = archives[0];
@@ -103,7 +103,7 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
     );
     const downloaderFiles = await fsp.readdir(path.join(skill, 'references/downloader'));
     expect(downloaderFiles).toContain('third-party-licenses.txt');
-    expect(downloaderFiles.some((name) => name.endsWith('.map'))).toBe(false);
+    expect(downloaderFiles).toContain('cli.mjs.map');
     expect((await fsp.readdir(path.join(skill, 'scripts'))).sort()).toEqual([
       'doctor.mjs',
       'download.mjs',

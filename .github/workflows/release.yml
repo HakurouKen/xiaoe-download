@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: skill-release
-          path: dist/release/*
+          path: release/*
           if-no-files-found: error
           retention-days: 7
 
@@ -83,7 +83,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: skill-release
-          path: dist/release
+          path: release
       - name: 验证同一份 ZIP 安装包
         run: pnpm exec vitest run --config skills/xiaoe-download/tests/vitest.config.mjs skills/xiaoe-download/tests/package.e2e.mjs
 
@@ -108,9 +108,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: skill-release
-          path: dist/release
+          path: release
       - name: 校验已验收的发布附件
-        working-directory: dist/release
+        working-directory: release
         run: |
           archive="xiaoe-download-skill-${RELEASE_TAG}.zip"
           test -s "$archive"
@@ -146,7 +146,7 @@ jobs:
             gh release create "$RELEASE_TAG" --verify-tag --draft \
               --target "$RELEASE_SHA" --title "$RELEASE_TAG" --generate-notes
           fi
-          archive="dist/release/xiaoe-download-skill-${RELEASE_TAG}.zip"
+          archive="release/xiaoe-download-skill-${RELEASE_TAG}.zip"
           gh release upload "$RELEASE_TAG" "$archive" "$archive.sha256" --clobber
 
           # 正式发布前，下载并逐字节核对已上传的附件。

@@ -50,8 +50,8 @@ if (name === 'git') {
   if (args[1] === 'download') {
     if (scenario === 'download-failure') fail();
     const dir = args[args.indexOf('--dir') + 1];
-    for (const file of fs.readdirSync('dist/release')) {
-      fs.copyFileSync(path.join('dist/release', file), path.join(dir, file));
+    for (const file of fs.readdirSync('release')) {
+      fs.copyFileSync(path.join('release', file), path.join(dir, file));
       if (scenario === 'corrupt-upload') fs.appendFileSync(path.join(dir, file), 'corrupt');
     }
   }
@@ -61,7 +61,7 @@ if (name === 'git') {
         await fsp.writeFile(path.join(bin, name), mock);
         await fsp.chmod(path.join(bin, name), 0o755);
       }
-      const release = path.join(root, 'dist/release');
+      const release = path.join(root, 'release');
       await fsp.mkdir(release, { recursive: true });
       await fsp.writeFile(path.join(release, 'xiaoe-download-skill-v0.1.0.zip'), 'tested zip');
       await fsp.writeFile(

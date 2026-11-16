@@ -29,12 +29,6 @@ export async function packSkill(project: string, filename: string): Promise<stri
     )
       throw new Error('references/downloader 必须为指向项目 dist 的软链接');
     const copy = async (from: string, relative: string): Promise<void> => {
-      if (
-        relative
-          .split('/')
-          .some((name) => !/^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(name) || name === 'node_modules')
-      )
-        throw new Error(`非交付文件：${relative}`);
       const stat = await fsp.lstat(from);
       if (stat.isSymbolicLink() || (!stat.isDirectory() && !stat.isFile()))
         throw new Error(`交付资源不允许额外符号链接或特殊文件：${from}`);
@@ -44,12 +38,6 @@ export async function packSkill(project: string, filename: string): Promise<stri
         }
         return;
       }
-      if (
-        !/^(?:SKILL\.md|scripts\/[^/]+\.mjs|references\/downloader\/[^/]+\.mjs|references\/(?:[^/]+\/)*[^/]+\.(?:md|txt))$/.test(
-          relative,
-        )
-      )
-        throw new Error(`非交付文件：${relative}`);
       const entry = `xiaoe-download/${relative}`;
       const target = path.join(root, entry);
       await fsp.mkdir(path.dirname(target), { recursive: true });
@@ -65,11 +53,7 @@ export async function packSkill(project: string, filename: string): Promise<stri
       if (name === 'downloader') continue;
       await copy(path.join(source, 'references', name), `references/${name}`);
     }
-    // 仅消费 dist 根级运行文件和同次构建的许可声明，不递归打包发布目录。
-    for (const name of (await fsp.readdir(dist)).sort()) {
-      if (name.endsWith('.mjs') || name === 'third-party-licenses.txt')
-        await copy(path.join(dist, name), `references/downloader/${name}`);
-    }
+    await copy(dist, 'references/downloader');
     for (const required of [
       'SKILL.md',
       'scripts/doctor.mjs',
@@ -88,7 +72,7 @@ export async function packSkill(project: string, filename: string): Promise<stri
     const archive = path.join(root, filename);
     await execFile('zip', ['-X', '-q', archive, ...entries.sort()], { cwd: root });
     const data = await fsp.readFile(archive);
-    const output = path.join(dist, 'release');
+    const output = path.resolve(project, 'release');
     await fsp.rm(output, { recursive: true, force: true });
     await fsp.mkdir(output);
     await fsp.copyFile(archive, path.join(output, filename));
@@ -131,7 +115,7 @@ async function main(): Promise<void> {
   util.parseArgs({ options: {} });
   const filename = archiveName(metadata.version);
   await packSkill(process.cwd(), filename);
-  console.log(`Skill 分发包已生成：dist/release/${filename}`);
+  console.log(`Skill 分发包已生成：release/${filename}`);
 }
 
 if (process.argv[1] && import.meta.url === url.pathToFileURL(path.resolve(process.argv[1])).href) {
