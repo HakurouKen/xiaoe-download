@@ -36,7 +36,7 @@ it.skipIf(process.platform === 'win32')(
         'scripts/skill-environment.mjs',
       ])
         await fsp.writeFile(path.join(skill, name), name);
-      for (const name of ['cli.mjs', 'shared.mjs', 'third-party-licenses.txt', 'cli.mjs.map'])
+      for (const name of ['cli.mjs', 'shared.mjs', 'third-party-licenses.txt'])
         await fsp.writeFile(path.join(dist, name), name);
       await fsp.mkdir(path.join(skill, 'tests'));
       await fsp.writeFile(path.join(skill, 'tests/private.test.mjs'), 'not delivered');
@@ -52,7 +52,6 @@ it.skipIf(process.platform === 'win32')(
         'xiaoe-download/SKILL.md',
         'xiaoe-download/references/downloader/assets/config.json',
         'xiaoe-download/references/downloader/cli.mjs',
-        'xiaoe-download/references/downloader/cli.mjs.map',
         'xiaoe-download/references/downloader/shared.mjs',
         'xiaoe-download/references/downloader/third-party-licenses.txt',
         'xiaoe-download/scripts/doctor.mjs',

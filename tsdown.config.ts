@@ -110,5 +110,5 @@ export default defineConfig({
   ],
   hooks: { 'build:done': async ({ chunks }) => collectLicenses(chunks) },
   shims: true,
-  sourcemap: true,
+  sourcemap: false,
 });

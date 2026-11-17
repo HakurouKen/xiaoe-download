@@ -113,7 +113,7 @@ it('校验并解压最终 Skill ZIP 后在包外独立检查、准备和扫描�
       expect((await fsp.stat(path.join(skill, required))).size, required).toBeGreaterThan(0);
     }
     const downloaderFiles = await fsp.readdir(path.join(skill, 'references/downloader'));
-    expect(downloaderFiles).toContain('cli.mjs.map');
+    expect(downloaderFiles.some((name) => name.endsWith('.map'))).toBe(false);
     expect((await fsp.readdir(path.join(skill, 'scripts'))).sort()).toEqual([
       'doctor.mjs',
       'download.mjs',
